@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Sparkles, Save, FileText, ClipboardList, RefreshCw, Download } from 'lucide-react';
+import { Plus, Sparkles, Save, FileText, ClipboardList, RefreshCw, Download, Printer, FileSpreadsheet } from 'lucide-react';
 import { Note, NoteFormData, ReportState } from './types';
 import InputWithSuggestions from './components/InputWithSuggestions';
 import NoteCard from './components/NoteCard';
@@ -81,6 +81,92 @@ const App: React.FC = () => {
     setReportState({ isGenerating: false, content: null, error: null });
   };
 
+  // --- Export Functions ---
+
+  const handleExportPDF = () => {
+    if (!reportState.content) return;
+    
+    // Open a new window for printing
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Review Report</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; line-height: 1.6; color: #1f2937; }
+            h1 { font-size: 24px; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px; }
+            .content { white-space: pre-wrap; }
+          </style>
+        </head>
+        <body>
+          <h1>Review Report</h1>
+          <div class="content">${reportState.content}</div>
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+        </html>
+      `;
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+    }
+  };
+
+  const handleExportWord = () => {
+    if (!reportState.content) return;
+
+    // Create a simple HTML structure for Word
+    const htmlContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset='utf-8'><title>Review Report</title></head>
+      <body>
+        <div style="font-family: sans-serif; white-space: pre-wrap;">
+          ${reportState.content}
+        </div>
+      </body>
+      </html>
+    `;
+    
+    const blob = new Blob([htmlContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Review-Report-${new Date().toISOString().slice(0,10)}.doc`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportExcel = () => {
+    if (notes.length === 0) return;
+
+    const headers = ["Category", "Owner", "Title", "Description", "Content", "Date"];
+    const csvContent = [
+      headers.join(","),
+      ...notes.map(n => {
+        // Escape quotes and wrap fields in quotes to handle commas within text
+        const row = [
+          n.category,
+          n.owner,
+          n.title,
+          n.description,
+          n.content,
+          new Date(n.timestamp).toLocaleDateString()
+        ].map(field => `"${(field || '').replace(/"/g, '""')}"`);
+        return row.join(",");
+      })
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Review-Notes-${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Header */}
@@ -116,18 +202,21 @@ const App: React.FC = () => {
                   >
                     Close
                   </button>
+                  
                   <button 
-                     onClick={() => {
-                       const blob = new Blob([reportState.content || ''], { type: 'text/markdown' });
-                       const url = URL.createObjectURL(blob);
-                       const a = document.createElement('a');
-                       a.href = url;
-                       a.download = `review-report-${new Date().toISOString().slice(0,10)}.md`;
-                       a.click();
-                     }}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm flex items-center gap-2"
+                    onClick={handleExportWord}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm flex items-center gap-2 transition-colors"
+                    title="Download as Word Doc"
                   >
-                    <Download size={16} /> Export
+                    <FileText size={16} /> Word
+                  </button>
+
+                  <button 
+                    onClick={handleExportPDF}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg shadow-sm flex items-center gap-2 transition-colors"
+                    title="Print or Save as PDF"
+                  >
+                    <Printer size={16} /> PDF
                   </button>
                 </div>
               </div>
@@ -235,29 +324,42 @@ const App: React.FC = () => {
                 <p className="text-gray-500 mt-1">Manage notes before generating final output</p>
               </div>
               
-              <button
-                onClick={handleGenerateReport}
-                disabled={notes.length === 0 || reportState.isGenerating}
-                className={`
-                  flex items-center px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all
-                  ${notes.length === 0 || reportState.isGenerating 
-                    ? 'bg-gray-300 cursor-not-allowed opacity-70' 
-                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:shadow-blue-200 hover:shadow-xl active:scale-95'
-                  }
-                `}
-              >
-                {reportState.isGenerating ? (
-                  <>
-                    <RefreshCw className="animate-spin mr-2" size={20} />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2" size={20} />
-                    Generate Report
-                  </>
+              <div className="flex gap-2">
+                {notes.length > 0 && (
+                  <button
+                    onClick={handleExportExcel}
+                    className="flex items-center px-4 py-3 rounded-xl font-medium text-gray-700 bg-white border border-gray-300 shadow-sm hover:bg-gray-50 transition-all"
+                    title="Export notes to Excel/CSV"
+                  >
+                    <FileSpreadsheet className="mr-2 text-green-600" size={20} />
+                    Export CSV
+                  </button>
                 )}
-              </button>
+
+                <button
+                  onClick={handleGenerateReport}
+                  disabled={notes.length === 0 || reportState.isGenerating}
+                  className={`
+                    flex items-center px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all
+                    ${notes.length === 0 || reportState.isGenerating 
+                      ? 'bg-gray-300 cursor-not-allowed opacity-70' 
+                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:shadow-blue-200 hover:shadow-xl active:scale-95'
+                    }
+                  `}
+                >
+                  {reportState.isGenerating ? (
+                    <>
+                      <RefreshCw className="animate-spin mr-2" size={20} />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2" size={20} />
+                      Generate Report
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {reportState.error && (
