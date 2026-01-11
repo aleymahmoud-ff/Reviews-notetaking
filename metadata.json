@@ -1,0 +1,5 @@
+{
+  "name": "Reviews Note Taking",
+  "description": "A professional note-taking application for business reviews. Log observations by function and owner, manage a queue of notes, and generate comprehensive reports using Gemini AI.",
+  "requestFramePermissions": []
+}
