@@ -4,7 +4,8 @@ import { Note } from "../types";
 const getClient = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("API Key is missing. Please ensure process.env.API_KEY is available.");
+    console.error("API_KEY is currently:", apiKey);
+    throw new Error("API Key is missing. If you are on Vercel, please check: 1. You added API_KEY to Env Variables. 2. You REDEPLOYED after adding it. 3. You are checking the correct environment (Preview vs Production).");
   }
   return new GoogleGenAI({ apiKey });
 };
